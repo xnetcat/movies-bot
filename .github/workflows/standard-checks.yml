@@ -1,0 +1,49 @@
+name: Standard code checks (MyPy/Pylint/Black)
+
+on: [push, pull_request]
+
+jobs:
+  checks:
+    if: "!contains(github.event.commits[0].message, '[skip ci]')"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Python v3.10
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+
+      - name: Install poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v2
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        run: poetry install -E web
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+
+      - name: Check for docstring's
+        run: |
+          poetry run pylint --limit-inference-results 0 --disable all --enable missing-function-docstring missing-module-docstring missing-class-docstring empty-docstring ./movies
+
+      - name: Run Pylint check
+        run: |
+          poetry run pylint --fail-under 10 --limit-inference-results 0 ./movies
+
+      - name: Run MyPy check
+        run: |
+          poetry run mypy --ignore-missing-imports --follow-imports silent --install-types --non-interactive ./movies
+
+      - name: Run Black check
+        run: |
+          poetry run black --check ./movies
